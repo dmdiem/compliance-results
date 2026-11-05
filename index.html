@@ -130,6 +130,20 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px soli
 .place .nm{font-size:24px;font-weight:700;overflow-wrap:anywhere}
 .place .sc{color:var(--muted);font-variant-numeric:tabular-nums}
 
+/* standings */
+.standings{display:grid;gap:10px}
+table.rank{min-width:560px}
+table.rank td{padding:7px 6px}
+table.rank .r{text-align:right}
+table.rank .pl{font-family:var(--display);color:var(--muted);width:2.5em}
+table.rank tr.top .pl{color:var(--gold)}
+table.rank tr.top td{background:color-mix(in srgb,var(--gold) 9%,transparent)}
+table.rank .sc{font-weight:700;color:var(--fg)}
+table.rank tr.top .sc{color:var(--gold)}
+table.rank .pos{color:var(--plus)}
+table.rank .neg{color:var(--minus)}
+table.rank .who{display:flex;align-items:center;gap:6px}
+.winner{color:var(--gold);font-weight:700}
 /* roster */
 .tbl-scroll{overflow-x:auto}
 table{border-collapse:collapse;width:100%;min-width:620px;font-variant-numeric:tabular-nums}
@@ -167,6 +181,13 @@ textarea{width:100%;font:inherit;font-size:14px;background:var(--bg);color:var(-
     <div class="duel" id="duel"></div>
     <div class="note" id="duelNote"></div>
     <div class="podium" id="podium" hidden></div>
+    <div id="standings" class="standings" hidden>
+      <h2>Final standings</h2>
+      <div class="tbl-scroll"><table class="rank">
+        <thead><tr><th>#</th><th>Dawg</th><th>Summon</th><th class="r">Blink</th><th class="r">Adj.</th><th class="r">Quiz</th><th class="r">Score</th><th>Went out</th></tr></thead>
+        <tbody id="rankRows"></tbody>
+      </table></div>
+    </div>
   </section>
 
   <section class="panel" id="bracketPanel" hidden>
@@ -396,6 +417,25 @@ function showPodium(){
   $("#podium").innerHTML=`<div class="place"><div class="pod-art"><img src="${dogSrc(champ)}" alt=""><img src="${eggFor(champ).src}" alt=""></div><div class="t">WINNER · CHAMPION</div><div class="nm">${esc(champ.name)}</div><div class="sc">${fmt(score(champ))} pts</div></div>
     <div class="place"><div class="pod-art"><img src="${dogSrc(ru)}" alt=""><img src="${eggFor(ru).src}" alt=""></div><div class="t">WINNER · FINALIST</div><div class="nm">${esc(ru.name)}</div><div class="sc">${fmt(score(ru))} pts</div></div>`;
   $("#podium").hidden=false;
+  showStandings();
+}
+function exitRound(p){
+  // the round a player lost in, or champion
+  for(let r=0;r<rounds.length;r++)for(const m of rounds[r])if(!m.bye&&(m.a===p||m.b===p)&&m.w!==p)return{r,label:roundName(r).replace("ROUND OF","Round of").replace(/^(\w)(\w+)$/,(x,a,b)=>a+b.toLowerCase())};
+  return{r:rounds.length,label:"Champion"};
+}
+function showStandings(){
+  const ranked=entries.filter(e=>e.name.trim()).sort((x,y)=>score(y)-score(x)||quizFrac(y.quiz)-quizFrac(x.quiz));
+  $("#rankRows").innerHTML=ranked.map((p,i)=>{const adj=(num(p.rep)-num(p.dog))*ADJ,g=eggFor(p),ex=exitRound(p),win=i<2;
+    return `<tr class="${win?"top":""}"><td class="pl">${i+1}</td>
+      <td><span class="who"><img class="mini" src="${dogSrc(p)}" alt=""><span>${esc(p.name)}</span></span></td>
+      <td><span class="who"><img class="mini" src="${g.src}" alt=""><b class="gr g-${g.g}">${g.g}</b></span></td>
+      <td class="r">${fmt(num(p.roll))}</td>
+      <td class="r ${adj>0?"pos":adj<0?"neg":""}">${adj?(adj>0?"+":"−")+fmt(Math.abs(adj)):"0"}</td>
+      <td class="r">${quizFrac(p.quiz)?"×"+fmt(mult(p)):"×1"}</td>
+      <td class="r sc">${fmt(score(p))}</td>
+      <td>${win?`<b class="winner">${ex.label==="Champion"?"Champion":"Finalist"}</b>`:ex.label}</td></tr>`}).join("");
+  $("#standings").hidden=false;
 }
 let playing=false,timer=null;
 function setPlayBtn(){const b=$("#playBtn");b.textContent=!cursor?"Watch again":playing?"Pause":rounds.some(r=>r.some(m=>m.shown&&!m.bye))?"Resume":"Play";}
@@ -427,7 +467,7 @@ function start(){
   if(n<2){alertRow("Add at least two people with names.");return;}
   const missing=entries.filter(e=>e.name.trim()&&String(e.roll).trim()==="").map(e=>e.name);
   if(missing.length){alertRow("Still need a Blink roll for: "+missing.join(", ")+".");return;}
-  stop();build();$("#podium").hidden=true;
+  stop();build();$("#podium").hidden=true;$("#standings").hidden=true;
   $("#setup").hidden=true;$("#arena").hidden=false;$("#bracketPanel").hidden=false;
   animToken++;$("#duel").className="duel";$("#duel").innerHTML="";$("#duelNote").textContent=`${n} Dawgs, one bracket. Press Play to watch it unfold.`;
   render();
