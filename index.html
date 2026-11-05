@@ -151,7 +151,7 @@ textarea{width:100%;font:inherit;font-size:14px;background:var(--bg);color:var(-
 <div class="wrap">
   <header>
     <h1>Compliance Champions Cup</h1>
-    <p class="sub">DWG-101 raffle, tournament style. Each Dawg brings the dog from their certificate and the aingegg their /blink summoned. Going in you only see their blink distance. Dog touches, phishing and the quiz bonus get applied mid-battle, and the higher final score advances. The two finalists win.</p>
+    <p class="sub">DWG-101 raffle, tournament style. Each Dawg brings the dog from their certificate and the aingegg their /blink summoned. The top two final scores were seeded at opposite ends of the bracket and everyone else was drawn at random. Going in you only see their blink distance. Dog touches, phishing and the quiz bonus get applied mid-battle, and the higher final score advances. The two finalists win.</p>
     <div class="formula">Score = (<b>blink px</b> − dog touches + phishing) × (1 + <b>quiz</b>)</div>
     <p class="sub" style="font-size:13px">Phishing: +1 reported, 0 ignored, −1 clicked the link. Quiz is the first-try percent, 0 if unfinished. Summon grade by blink: E under 130 px, D 130+, C 215+, B 325+, A 435+, S 545+. Bracket draw seed 20261104.</p>
   </header>
@@ -295,13 +295,14 @@ function decide(a,b){
 }
 function build(){
   rng=mulberry32(DRAW_SEED);
-  const players=shuffle(entries.filter(e=>e.name.trim()));
-  let size=1;while(size<players.length)size*=2;
-  const byes=size-players.length;
-  let r1=[];
-  for(let i=0;i<byes;i++)r1.push({a:players[i],b:null});
-  for(let i=byes;i<players.length;i+=2)r1.push({a:players[i],b:players[i+1]});
-  r1=shuffle(r1);
+  // top two final scores are seeded at opposite ends so they can only meet in the final; everyone else is drawn at random
+  const ranked=entries.filter(e=>e.name.trim()).sort((x,y)=>score(y)-score(x)||quizFrac(y.quiz)-quizFrac(x.quiz));
+  const [s1,s2]=ranked;const rest=shuffle(ranked.slice(2));
+  let size=1;while(size<ranked.length)size*=2;
+  const M=size/2,byeSet=new Set(shuffle([...Array(M).keys()]).slice(0,size-ranked.length));
+  const r1=[...Array(M)].map(()=>({a:null,b:null}));
+  r1[0].a=s1;if(s2)r1[M-1].a=s2;
+  r1.forEach((m,k)=>{if(!m.a)m.a=rest.pop()||null;if(!byeSet.has(k))m.b=rest.pop()||null;});
   rounds=[r1];
   // resolve all results up front, reveal later
   let cur=r1;
