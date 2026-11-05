@@ -12,6 +12,7 @@
 :root{
   --bg:#141a2e; --panel:#1d2540; --line:#2f3a60; --fg:#eef1fb; --muted:#9aa4c7;
   --gold:#f5c443; --gold-ink:#2a1f00; --cyan:#5fd4e8; --loss:#6b7396;
+  --plus:#6ee7a8; --minus:#ff7d8e;
   --display:"Bungee","Impact",system-ui,sans-serif;
   --body:"Chakra Petch",system-ui,-apple-system,sans-serif;
   color-scheme:dark;
@@ -43,6 +44,16 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px soli
 .fighter .sc small{font-family:var(--body);font-size:.35em;font-weight:600;color:var(--muted);margin-left:3px}
 .fighter.tick .br{color:var(--cyan);animation:pop .35s}
 @keyframes pop{40%{transform:scale(1.12)}}
+.mods{display:flex;flex-direction:column;align-items:center;gap:6px;min-height:68px;justify-content:flex-start}
+.chip{display:inline-flex;align-items:baseline;gap:6px;font-weight:600;font-size:14px;padding:4px 10px;border-radius:999px;border:1.5px solid currentColor;background:color-mix(in srgb,currentColor 12%,transparent);animation:chipIn .45s cubic-bezier(.3,1.5,.5,1) both}
+.chip b{font-family:var(--display);font-weight:400;font-size:17px;letter-spacing:.5px}
+.chip.plus{color:var(--plus)}
+.chip.minus{color:var(--minus)}
+.chip.mult{color:var(--gold);font-size:15px}
+.chip.mult b{font-size:20px}
+.chip.none{color:var(--muted)}
+@keyframes chipIn{0%{transform:scale(.3);opacity:0}100%{transform:none;opacity:1}}
+@media (max-width:560px){.chip{font-size:11px;padding:3px 7px;gap:4px}.chip b{font-size:13px}.chip.mult b{font-size:15px}.mods{min-height:58px}}
 .fighter .br{color:var(--muted);font-size:13px;font-variant-numeric:tabular-nums}
 .fighter.win{border-color:var(--gold);transform:scale(1.03)}
 .fighter.win .sc{color:var(--gold)}
@@ -308,10 +319,18 @@ function nextHidden(){for(let r=0;r<rounds.length;r++)for(let i=0;i<rounds[r].le
 function fighterHTML(p,side,hidden){return `<div class="fighter side-${side}${hidden?" mystery":""}"><span class="crown">ADVANCES</span>
   <div class="spr"><img class="pup" src="${dogSrc(p)}" alt=""><div class="face"><img src="${eggFor(p).src}" alt=""><b class="gr g-${eggFor(p).g}">${eggFor(p).g}</b></div></div>
   <div class="nm">${esc(p.name)}</div><div class="sc">${hidden?`${fmt(num(p.roll))}<small>px</small>`:fmt(score(p))}</div>
+  <div class="mods">${hidden?"":chipsFor(p).join("")}</div>
   <div class="br">${hidden?"blink distance":fullBreak(p)}</div></div>`}
 const mult=p=>Math.round((1+quizFrac(p.quiz))*100)/100;
 const base=p=>num(p.roll)-num(p.dog)+num(p.rep);
 function fullBreak(p){return `(${fmt(num(p.roll))} − ${fmt(num(p.dog))} + ${fmt(num(p.rep))}) × ${fmt(mult(p))}`}
+function modChips(p){const o=[],d=num(p.dog),ph=num(p.rep);
+  if(d)o.push(`<span class="chip minus"><b>−${fmt(d)}</b> touched the dog</span>`);
+  if(ph>0)o.push(`<span class="chip plus"><b>+1</b> reported the phish</span>`);
+  if(ph<0)o.push(`<span class="chip minus"><b>−1</b> clicked the link</span>`);
+  return o}
+function quizChip(p){const q=quizFrac(p.quiz);return q?`<span class="chip mult"><b>×${fmt(mult(p))}</b> quiz ${Math.round(q*100)}%</span>`:`<span class="chip none"><b>×1</b> quiz unfinished</span>`}
+function chipsFor(p){return[...modChips(p),quizChip(p)]}
 function modText(p){const o=[],d=num(p.dog),ph=num(p.rep);if(d)o.push(`−${fmt(d)} dog touch${d>1?"es":""}`);if(ph>0)o.push("+1 reported the phish");if(ph<0)o.push("−1 clicked the link");return o.join(", ")}
 function quizText(p){const q=quizFrac(p.quiz);return q?`× ${fmt(mult(p))} quiz bonus (${Math.round(q*100)}%)`:"× 1, quiz unfinished"}
 function countTo(el,from,to,ms,tok){const t0=performance.now();(function tick(t){if(tok!==animToken)return;const k=Math.min(1,(t-t0)/ms),e=1-Math.pow(1-k,3);el.textContent=fmt(k<1?Math.round(from+(to-from)*e):to);if(k<1)requestAnimationFrame(tick)})(t0)}
@@ -337,12 +356,22 @@ function showDuel(m,reveal,animate,done){
     if(tok!==animToken)return;
     const fs=$("#duel").querySelectorAll(".fighter"),ps=[m.a,m.b];
     const anyMod=ps.some(p=>base(p)!==num(p.roll));
-    ps.forEach((p,k)=>{const sc=fs[k].querySelector(".sc");sc.textContent=fmt(num(p.roll));if(base(p)!==num(p.roll)){fs[k].querySelector(".br").textContent=modText(p);fs[k].classList.add("tick");countTo(sc,num(p.roll),base(p),450,tok);}});
+    const addChips=(k,html)=>{const box=fs[k].querySelector(".mods");box.insertAdjacentHTML("beforeend",html);};
+    ps.forEach((p,k)=>{fs[k].querySelector(".sc").textContent=fmt(num(p.roll));fs[k].querySelector(".br").textContent="blink distance";});
+    if(anyMod){
+      $("#duelNote").textContent="Bonuses and penalties…";
+      ps.forEach((p,k)=>{if(base(p)!==num(p.roll)){addChips(k,modChips(p).join(""));countTo(fs[k].querySelector(".sc"),num(p.roll),base(p),800,tok);}});
+    }
     setTimeout(()=>{
       if(tok!==animToken)return;
-      ps.forEach((p,k)=>{fs[k].classList.remove("tick");void fs[k].offsetWidth;fs[k].classList.add("tick");fs[k].querySelector(".br").textContent=quizText(p);countTo(fs[k].querySelector(".sc"),base(p),score(p),900,tok);});
-      setTimeout(()=>{if(tok!==animToken)return;ps.forEach((p,k)=>fs[k].querySelector(".br").textContent=fullBreak(p));finishDuel(m);done&&done()},1150);
-    },anyMod?750:150);
+      $("#duelNote").textContent="Quiz multiplier!";
+      ps.forEach((p,k)=>{addChips(k,quizChip(p));fs[k].querySelector(".br").textContent=base(p)!==num(p.roll)?`${fmt(base(p))} after adjustments`:"blink distance";});
+      setTimeout(()=>{
+        if(tok!==animToken)return;
+        ps.forEach((p,k)=>countTo(fs[k].querySelector(".sc"),base(p),score(p),1300,tok));
+        setTimeout(()=>{if(tok!==animToken)return;ps.forEach((p,k)=>fs[k].querySelector(".br").textContent=fullBreak(p));finishDuel(m);done&&done()},2200);
+      },700);
+    },anyMod?2000:300);
   },420);},650);
 }
 
