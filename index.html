@@ -152,8 +152,8 @@ textarea{width:100%;font:inherit;font-size:14px;background:var(--bg);color:var(-
   <header>
     <h1>Compliance Champions Cup</h1>
     <p class="sub">DWG-101 raffle, tournament style. Each Dawg brings the dog from their certificate and the aingegg their /blink summoned. The top two final scores were seeded at opposite ends of the bracket and everyone else was drawn at random. Going in you only see their blink distance. Dog touches, phishing and the quiz bonus get applied mid-battle, and the higher final score advances. The two finalists win.</p>
-    <div class="formula">Score = (<b>blink px</b> − dog touches + phishing) × (1 + <b>quiz</b>)</div>
-    <p class="sub" style="font-size:13px">Phishing: +1 reported, 0 ignored, −1 clicked the link. Quiz is the first-try percent, 0 if unfinished. Summon grade by blink: E under 130 px, D 130+, C 215+, B 325+, A 435+, S 545+. Bracket draw seed 20261104.</p>
+    <div class="formula">Score = (<b>blink px</b> − 50 per dog touch ± 50 phishing) × (1 + <b>quiz</b>)</div>
+    <p class="sub" style="font-size:13px">Phishing: +50 for reporting it, 0 for ignoring it, −50 for clicking the link. Each dog touch is −50. Quiz is the first-try percent, 0 if unfinished. Summon grade by blink: E under 130 px, D 130+, C 215+, B 325+, A 435+, S 545+. Bracket draw seed 20261104.</p>
   </header>
 
   <section class="panel" id="arena" hidden>
@@ -233,7 +233,8 @@ function save(){}
 function mk(name="",roll="",dog=0,rep=0,quiz="",pup=""){return{id:uid++,name,roll,dog,rep,quiz,pup:DOGS[pup]?pup:DOG_KEYS[hashStr(name)%DOG_KEYS.length]}}
 const num=v=>{const n=parseFloat(v);return isFinite(n)?n:0};
 const quizFrac=q=>{const n=num(q);return n>1?n/100:n};
-function score(e){return Math.round((num(e.roll)-num(e.dog)+num(e.rep))*(1+quizFrac(e.quiz))*100)/100}
+const ADJ=50;
+function score(e){return Math.round((num(e.roll)-num(e.dog)*ADJ+num(e.rep)*ADJ)*(1+quizFrac(e.quiz))*100)/100}
 const fmt=n=>Number.isInteger(n)?String(n):n.toFixed(2).replace(/0$/,"");
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 
@@ -323,12 +324,12 @@ function fighterHTML(p,side,hidden){return `<div class="fighter side-${side}${hi
   <div class="mods">${hidden?"":chipsFor(p).join("")}</div>
   <div class="br">${hidden?"blink distance":fullBreak(p)}</div></div>`}
 const mult=p=>Math.round((1+quizFrac(p.quiz))*100)/100;
-const base=p=>num(p.roll)-num(p.dog)+num(p.rep);
-function fullBreak(p){return `(${fmt(num(p.roll))} − ${fmt(num(p.dog))} + ${fmt(num(p.rep))}) × ${fmt(mult(p))}`}
+const base=p=>num(p.roll)-num(p.dog)*ADJ+num(p.rep)*ADJ;
+function fullBreak(p){const adj=(num(p.rep)-num(p.dog))*ADJ;return adj?`(${fmt(num(p.roll))} ${adj>0?"+":"−"} ${fmt(Math.abs(adj))}) × ${fmt(mult(p))}`:`${fmt(num(p.roll))} × ${fmt(mult(p))}`}
 function modChips(p){const o=[],d=num(p.dog),ph=num(p.rep);
-  if(d)o.push(`<span class="chip minus"><b>−${fmt(d)}</b> touched the dog</span>`);
-  if(ph>0)o.push(`<span class="chip plus"><b>+1</b> reported the phish</span>`);
-  if(ph<0)o.push(`<span class="chip minus"><b>−1</b> clicked the link</span>`);
+  if(d)o.push(`<span class="chip minus"><b>−${fmt(d*ADJ)}</b> touched the dog${d>1?` ×${fmt(d)}`:""}</span>`);
+  if(ph>0)o.push(`<span class="chip plus"><b>+${ADJ}</b> reported the phish</span>`);
+  if(ph<0)o.push(`<span class="chip minus"><b>−${ADJ}</b> clicked the link</span>`);
   return o}
 function quizChip(p){const q=quizFrac(p.quiz);return q?`<span class="chip mult"><b>×${fmt(mult(p))}</b> quiz ${Math.round(q*100)}%</span>`:`<span class="chip none"><b>×1</b> quiz unfinished</span>`}
 function chipsFor(p){return[...modChips(p),quizChip(p)]}
