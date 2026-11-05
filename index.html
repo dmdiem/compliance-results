@@ -32,6 +32,9 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px soli
 .fighter{background:var(--bg);border:2px solid var(--line);border-radius:12px;padding:14px;display:grid;gap:4px;text-align:center;min-width:0;transition:border-color .3s,opacity .3s,transform .3s}
 .fighter .nm{font-weight:700;font-size:19px;overflow-wrap:anywhere}
 .fighter .sc{font-family:var(--display);font-size:clamp(30px,7vw,52px);line-height:1.1;font-variant-numeric:tabular-nums}
+.fighter .sc small{font-family:var(--body);font-size:.35em;font-weight:600;color:var(--muted);margin-left:3px}
+.fighter.tick .br{color:var(--cyan);animation:pop .35s}
+@keyframes pop{40%{transform:scale(1.12)}}
 .fighter .br{color:var(--muted);font-size:13px;font-variant-numeric:tabular-nums}
 .fighter.win{border-color:var(--gold);transform:scale(1.03)}
 .fighter.win .sc{color:var(--gold)}
@@ -126,7 +129,7 @@ textarea{width:100%;font:inherit;font-size:14px;background:var(--bg);color:var(-
 <div class="wrap">
   <header>
     <h1>Compliance Champions Cup</h1>
-    <p class="sub">DWG-101 raffle, tournament style. Each Dawg brings the dog from their certificate and the aingegg their /blink summoned. Everyone has one fixed score, the bracket was drawn at random, and the higher score advances every match. The two finalists win.</p>
+    <p class="sub">DWG-101 raffle, tournament style. Each Dawg brings the dog from their certificate and the aingegg their /blink summoned. Going in you only see their blink distance. Dog touches, phishing and the quiz bonus get applied mid-battle, and the higher final score advances. The two finalists win.</p>
     <div class="formula">Score = (<b>blink px</b> − dog touches + phishing) × (1 + <b>quiz</b>)</div>
     <p class="sub" style="font-size:13px">Phishing: +1 reported, 0 ignored, −1 clicked the link. Quiz is the first-try percent, 0 if unfinished. Summon grade by blink: E under 130 px, D 130+, C 215+, B 325+, A 435+, S 545+. Bracket draw seed 20261104.</p>
   </header>
@@ -295,8 +298,14 @@ function nextHidden(){for(let r=0;r<rounds.length;r++)for(let i=0;i<rounds[r].le
 
 function fighterHTML(p,side,hidden){return `<div class="fighter side-${side}${hidden?" mystery":""}"><span class="crown">ADVANCES</span>
   <div class="spr"><img class="pup" src="${dogSrc(p)}" alt=""><div class="face"><img src="${eggFor(p).src}" alt=""><b class="gr g-${eggFor(p).g}">${eggFor(p).g}</b></div></div>
-  <div class="nm">${esc(p.name)}</div><div class="sc">${hidden?"?":fmt(score(p))}</div>
-  <div class="br">${hidden?"score hidden":`(${fmt(num(p.roll))} − ${fmt(num(p.dog))} + ${fmt(num(p.rep))}) × ${fmt(Math.round((1+quizFrac(p.quiz))*100)/100)}`}</div></div>`}
+  <div class="nm">${esc(p.name)}</div><div class="sc">${hidden?`${fmt(num(p.roll))}<small>px</small>`:fmt(score(p))}</div>
+  <div class="br">${hidden?"blink distance":fullBreak(p)}</div></div>`}
+const mult=p=>Math.round((1+quizFrac(p.quiz))*100)/100;
+const base=p=>num(p.roll)-num(p.dog)+num(p.rep);
+function fullBreak(p){return `(${fmt(num(p.roll))} − ${fmt(num(p.dog))} + ${fmt(num(p.rep))}) × ${fmt(mult(p))}`}
+function modText(p){const o=[],d=num(p.dog),ph=num(p.rep);if(d)o.push(`−${fmt(d)} dog touch${d>1?"es":""}`);if(ph>0)o.push("+1 reported the phish");if(ph<0)o.push("−1 clicked the link");return o.join(", ")}
+function quizText(p){const q=quizFrac(p.quiz);return q?`× ${fmt(mult(p))} quiz bonus (${Math.round(q*100)}%)`:"× 1, quiz unfinished"}
+function countTo(el,from,to,ms,tok){const t0=performance.now();(function tick(t){if(tok!==animToken)return;const k=Math.min(1,(t-t0)/ms),e=1-Math.pow(1-k,3);el.textContent=fmt(k<1?Math.round(from+(to-from)*e):to);if(k<1)requestAnimationFrame(tick)})(t0)}
 
 let animToken=0;
 const reduced=matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -317,13 +326,14 @@ function showDuel(m,reveal,animate){
   setTimeout(()=>{if(tok!==animToken)return;$("#duelNote").textContent="Fight!";$("#duel").classList.add("clash");
   setTimeout(()=>{
     if(tok!==animToken)return;
-    const fs=$("#duel").querySelectorAll(".fighter");
-    [m.a,m.b].forEach((p,i)=>{
-      fs[i].querySelector(".br").textContent=`(${fmt(num(p.roll))} − ${fmt(num(p.dog))} + ${fmt(num(p.rep))}) × ${fmt(Math.round((1+quizFrac(p.quiz))*100)/100)}`;
-      const el=fs[i].querySelector(".sc"),target=score(p),t0=performance.now();
-      (function tick(t){if(tok!==animToken)return;const k=Math.min(1,(t-t0)/700);el.textContent=fmt(k<1?Math.round(target*(1-Math.pow(1-k,3))):target);if(k<1)requestAnimationFrame(tick);})(t0);
-    });
-    setTimeout(()=>{if(tok===animToken)finishDuel(m)},750);
+    const fs=$("#duel").querySelectorAll(".fighter"),ps=[m.a,m.b];
+    const anyMod=ps.some(p=>base(p)!==num(p.roll));
+    ps.forEach((p,k)=>{const sc=fs[k].querySelector(".sc");sc.textContent=fmt(num(p.roll));if(base(p)!==num(p.roll)){fs[k].querySelector(".br").textContent=modText(p);fs[k].classList.add("tick");countTo(sc,num(p.roll),base(p),450,tok);}});
+    setTimeout(()=>{
+      if(tok!==animToken)return;
+      ps.forEach((p,k)=>{fs[k].classList.remove("tick");void fs[k].offsetWidth;fs[k].classList.add("tick");fs[k].querySelector(".br").textContent=quizText(p);countTo(fs[k].querySelector(".sc"),base(p),score(p),900,tok);});
+      setTimeout(()=>{if(tok!==animToken)return;ps.forEach((p,k)=>fs[k].querySelector(".br").textContent=fullBreak(p));finishDuel(m)},1150);
+    },anyMod?750:150);
   },420);},650);
 }
 
@@ -332,7 +342,7 @@ function render(){
     const isCur=cursor&&cursor.r===ri&&cursor.i===mi;
     const row=(p)=>{if(!p)return`<div class="p bye"><span class="n">bye</span><span class="s"></span></div>`;
       const known=m.shown&&!m.bye;const cls=m.shown?(m.w===p?"w":(m.bye?"":"l")):"";
-      return`<div class="p ${cls}"><span class="who"><img class="mini" src="${dogSrc(p)}" alt=""><span class="n">${esc(p.name)}</span></span><span class="s">${known||m.bye?fmt(score(p)):"?"}</span></div>`};
+      return`<div class="p ${cls}"><span class="who"><img class="mini" src="${dogSrc(p)}" alt=""><span class="n">${esc(p.name)}</span></span><span class="s">${known?fmt(score(p)):fmt(num(p.roll))+" px"}</span></div>`};
     const a=ri===0||rounds[ri-1][mi*2].shown?m.a:null, b=ri===0||rounds[ri-1][mi*2+1].shown?m.b:null;
     const blank=`<div class="p"><span class="n" style="color:var(--loss)">TBD</span><span class="s"></span></div>`;
     return`<div class="m ${isCur?"cur":""}">${a?row(a):blank}${m.bye?row(null):(b?row(b):blank)}</div>`}).join("")}</div>`).join("");
