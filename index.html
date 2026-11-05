@@ -1,3 +1,9 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}</style>
 <title>Compliance Champions Cup</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Chakra+Petch:wght@400;500;600;700&display=swap">
@@ -11,6 +17,8 @@
   color-scheme:dark;
 }
 *{box-sizing:border-box}
+[hidden]{display:none!important}
+html{-webkit-text-size-adjust:100%}
 body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.45;
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 48px;
   background-image:radial-gradient(circle at 50% -20%, #2a3566 0, transparent 55%);}
@@ -125,6 +133,9 @@ textarea{width:100%;font:inherit;font-size:14px;background:var(--bg);color:var(-
 .flag{display:inline-block;font-size:11px;letter-spacing:.8px;text-transform:uppercase;background:var(--cyan);color:var(--bg);border-radius:4px;padding:2px 6px;font-weight:700}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
+</head>
+<body>
+
 
 <div class="wrap">
   <header>
@@ -141,6 +152,7 @@ textarea{width:100%;font:inherit;font-size:14px;background:var(--bg);color:var(-
         <button class="primary" id="nextBtn">Next match</button>
         <button id="roundBtn">Finish round</button>
         <button id="allBtn">Skip to end</button>
+        <button id="restartBtn">Start over</button>
       </div>
     </div>
     <div class="duel" id="duel"></div>
@@ -386,8 +398,12 @@ function start(){
 }
 function alertRow(msg){const h=$("#rosterHint");h.textContent=msg;h.style.color="var(--gold)";h.scrollIntoView({block:"nearest"});}
 $("#startBtn").onclick=start;
+$("#restartBtn").onclick=()=>start();
 $("#replayBtn").onclick=()=>{start();scrollTo({top:0,behavior:reduced?"auto":"smooth"});};
 
 
 load();renderRows();start();
 </script>
+
+</body>
+</html>
