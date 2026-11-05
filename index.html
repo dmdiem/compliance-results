@@ -149,10 +149,8 @@ textarea{width:100%;font:inherit;font-size:14px;background:var(--bg);color:var(-
     <div class="row" style="justify-content:space-between">
       <span class="round-tag" id="roundTag">ROUND 1</span>
       <div class="row">
-        <button class="primary" id="nextBtn">Next match</button>
-        <button id="roundBtn">Finish round</button>
-        <button id="allBtn">Skip to end</button>
-        <button id="restartBtn">Start over</button>
+        <button class="primary" id="playBtn">Play</button>
+        <button id="allBtn">Skip to results</button>
       </div>
     </div>
     <div class="duel" id="duel"></div>
@@ -164,7 +162,6 @@ textarea{width:100%;font:inherit;font-size:14px;background:var(--bg);color:var(-
     <div class="row" style="justify-content:space-between">
       <h2>Bracket</h2>
       <div class="row">
-        <button id="replayBtn">Watch again</button>
       </div>
     </div>
     <div class="bracket-scroll"><div class="bracket" id="bracket"></div></div>
@@ -327,10 +324,10 @@ function finishDuel(m){
   fa.classList.add(m.w===m.a?"win":"lose");fb.classList.add(m.w===m.b?"win":"lose");
   $("#duelNote").textContent=m.note||`${m.w.name} advances!`;
 }
-function showDuel(m,reveal,animate){
+function showDuel(m,reveal,animate,done){
   const tok=++animToken;
-  if(!reveal){setDuel(m,true);$("#duelNote").textContent="Press Reveal to summon and fight.";return;}
-  if(!animate||reduced){setDuel(m,false);finishDuel(m);return;}
+  if(!reveal){setDuel(m,true);return;}
+  if(!animate||reduced){setDuel(m,false);finishDuel(m);done&&done();return;}
   setDuel(m,true);
   $("#duelNote").textContent="Summoning…";
   void $("#duel").offsetWidth;
@@ -344,7 +341,7 @@ function showDuel(m,reveal,animate){
     setTimeout(()=>{
       if(tok!==animToken)return;
       ps.forEach((p,k)=>{fs[k].classList.remove("tick");void fs[k].offsetWidth;fs[k].classList.add("tick");fs[k].querySelector(".br").textContent=quizText(p);countTo(fs[k].querySelector(".sc"),base(p),score(p),900,tok);});
-      setTimeout(()=>{if(tok!==animToken)return;ps.forEach((p,k)=>fs[k].querySelector(".br").textContent=fullBreak(p));finishDuel(m)},1150);
+      setTimeout(()=>{if(tok!==animToken)return;ps.forEach((p,k)=>fs[k].querySelector(".br").textContent=fullBreak(p));finishDuel(m);done&&done()},1150);
     },anyMod?750:150);
   },420);},650);
 }
@@ -359,7 +356,7 @@ function render(){
     const blank=`<div class="p"><span class="n" style="color:var(--loss)">TBD</span><span class="s"></span></div>`;
     return`<div class="m ${isCur?"cur":""}">${a?row(a):blank}${m.bye?row(null):(b?row(b):blank)}</div>`}).join("")}</div>`).join("");
   $("#roundTag").textContent=cursor?roundName(cursor.r):"CHAMPIONS";
-  ["#nextBtn","#roundBtn","#allBtn"].forEach(s=>$(s).disabled=!cursor);
+  $("#allBtn").disabled=!cursor;setPlayBtn();
   if(!cursor)showPodium();
 }
 function showPodium(){
@@ -369,37 +366,43 @@ function showPodium(){
     <div class="place"><div class="pod-art"><img src="${dogSrc(ru)}" alt=""><img src="${eggFor(ru).src}" alt=""></div><div class="t">WINNER · FINALIST</div><div class="nm">${esc(ru.name)}</div><div class="sc">${fmt(score(ru))} pts</div></div>`;
   $("#podium").hidden=false;
 }
-let pending=false;
-function step(){
-  if(!cursor)return;
-  const m=rounds[cursor.r][cursor.i];
-  if(!pending){showDuel(m,false);pending=true;$("#nextBtn").textContent="Reveal";render();return;}
-  m.shown=true;showDuel(m,true,true);pending=false;$("#nextBtn").textContent="Next match";cursor=nextHidden();render();
+let playing=false,timer=null;
+function setPlayBtn(){const b=$("#playBtn");b.textContent=!cursor?"Watch again":playing?"Pause":rounds.some(r=>r.some(m=>m.shown&&!m.bye))?"Resume":"Play";}
+function stop(){playing=false;clearTimeout(timer);}
+function loop(){
+  if(!playing)return;
+  if(!cursor){stop();setPlayBtn();return;}
+  const {r,i}=cursor,m=rounds[r][i],isFinal=r===rounds.length-1;
+  showDuel(m,false);render();
+  $("#duelNote").textContent=isFinal?"The final. Winner takes the cup, but both of these Dawgs win.":`${m.a.name} vs ${m.b.name}`;
+  timer=setTimeout(()=>{
+    if(!playing)return;
+    showDuel(m,true,true,()=>{m.shown=true;cursor=nextHidden();render();timer=setTimeout(loop,isFinal?0:1700);});
+  },isFinal?2400:1300);
 }
-function revealUntil(pred){
-  let last=null;
-  while(cursor&&pred(cursor)){const m=rounds[cursor.r][cursor.i];m.shown=true;last=m;cursor=nextHidden();}
-  pending=false;$("#nextBtn").textContent="Next match";
+$("#playBtn").onclick=()=>{
+  if(!cursor){start();playing=true;setPlayBtn();loop();return;}
+  if(playing){stop();setPlayBtn();return;}
+  playing=true;setPlayBtn();loop();
+};
+$("#allBtn").onclick=()=>{
+  stop();animToken++;let last=null;
+  while(cursor){const m=rounds[cursor.r][cursor.i];m.shown=true;last=m;cursor=nextHidden();}
   if(last)showDuel(last,true,false);render();
-}
-$("#nextBtn").onclick=step;
-$("#roundBtn").onclick=()=>{if(!cursor)return;const r=cursor.r;revealUntil(c=>c.r===r);};
-$("#allBtn").onclick=()=>revealUntil(()=>true);
+};
 
 function start(){
   const n=entries.filter(e=>e.name.trim()).length;
   if(n<2){alertRow("Add at least two people with names.");return;}
   const missing=entries.filter(e=>e.name.trim()&&String(e.roll).trim()==="").map(e=>e.name);
   if(missing.length){alertRow("Still need a Blink roll for: "+missing.join(", ")+".");return;}
-  build();pending=false;$("#nextBtn").textContent="Next match";$("#podium").hidden=true;
+  stop();build();$("#podium").hidden=true;
   $("#setup").hidden=true;$("#arena").hidden=false;$("#bracketPanel").hidden=false;
-  animToken++;$("#duel").className="duel";$("#duel").innerHTML="";$("#duelNote").textContent=`${n} Dawgs, one bracket. Press Next match to start.`;
+  animToken++;$("#duel").className="duel";$("#duel").innerHTML="";$("#duelNote").textContent=`${n} Dawgs, one bracket. Press Play to watch it unfold.`;
   render();
 }
 function alertRow(msg){const h=$("#rosterHint");h.textContent=msg;h.style.color="var(--gold)";h.scrollIntoView({block:"nearest"});}
 $("#startBtn").onclick=start;
-$("#restartBtn").onclick=()=>start();
-$("#replayBtn").onclick=()=>{start();scrollTo({top:0,behavior:reduced?"auto":"smooth"});};
 
 
 load();renderRows();start();
